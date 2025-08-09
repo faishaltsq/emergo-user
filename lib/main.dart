@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import "./providers/contacts_provider.dart";
 import './screens/home_screen.dart';
 import './utils/app_theme.dart';
@@ -11,6 +12,7 @@ import './screens/settings_screen.dart';
 import './screens/emergency_screen.dart';
 import './services/notification_service.dart';
 import './services/shake_detection_service.dart';
+import './services/permission_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,21 +55,50 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = [
-    const HomeScreen(),
-    const MapScreen(),
-    const ContactsScreen(),
-    const HistoryScreen(),
-    const SettingsScreen(),
-  ];
+  late final List<Widget> _screens;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
+    // Request app-wide permissions on first run
+    _requestStartupPermissions();
+
+    // Build screens so HomeScreen can request tab changes
+    _screens = [
+      HomeScreen(
+        onNavigateToTab: (index) {
+          if (index >= 0 && index < 5) {
+            setState(() {
+              _currentIndex = index;
+            });
+          }
+        },
+      ),
+      const MapScreen(),
+      const ContactsScreen(),
+      const HistoryScreen(),
+      const SettingsScreen(),
+    ];
+
     // Start shake detection when app starts
     _initializeShakeDetection();
+  }
+
+  Future<void> _requestStartupPermissions() async {
+    final results = await PermissionService.requestAllRequiredPermissions();
+    final bool locGranted =
+        results[Permission.location] == PermissionStatus.granted;
+
+    if (mounted && !locGranted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content:
+              Text('Location permission denied. Some features may not work.'),
+        ),
+      );
+    }
   }
 
   @override

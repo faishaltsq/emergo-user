@@ -14,7 +14,7 @@ class MapScreen extends StatefulWidget {
 class _MapScreenState extends State<MapScreen> {
   GoogleMapController? _mapController;
   LatLng _currentPosition = const LatLng(-6.2088, 106.8456); // Default Jakarta
-  Set<Marker> _markers = {};
+  final Set<Marker> _markers = {};
   List<Map<String, dynamic>> _facilities = [];
   String _selectedFilter = 'hospital';
   bool _isLoading = true;

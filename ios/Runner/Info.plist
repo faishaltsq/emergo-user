@@ -45,5 +45,15 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>We use the camera to attach photos to emergency reports.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>We access your photo library to attach images to emergency reports.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Your location is used to include accurate coordinates in emergency alerts.</string>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>Tracking is used to improve emergency response accuracy.</string>
+	<key>UNUserNotificationCenterUsageDescription</key>
+	<string>Notifications are used to inform you about emergency status.</string>
 </dict>
 </plist>

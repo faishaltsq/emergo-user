@@ -4,7 +4,10 @@ import 'package:emergo/screens/emergency_screen.dart';
 import 'package:emergo/services/location_service.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({super.key, this.onNavigateToTab});
+
+  // Callback to request switching tabs in MainScreen
+  final ValueChanged<int>? onNavigateToTab;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -209,7 +212,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 icon: Icons.local_hospital,
                 label: 'Nearby Facilities',
                 subtitle: 'Find hospitals, police stations, fire departments',
-                onTap: () => _handleNavigation(context, 1), // Map index
+                onTap: () => _handleNavigation(1), // Map index
               ),
 
               const SizedBox(height: 12),
@@ -219,7 +222,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 icon: Icons.people,
                 label: 'Emergency Contacts',
                 subtitle: 'Manage your emergency contact list',
-                onTap: () => _handleNavigation(context, 2), // Contacts index
+                onTap: () => _handleNavigation(2), // Contacts index
               ),
 
               const SizedBox(height: 12),
@@ -229,7 +232,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 icon: Icons.history,
                 label: 'Emergency History',
                 subtitle: 'View your past emergency alerts',
-                onTap: () => _handleNavigation(context, 3), // History index
+                onTap: () => _handleNavigation(3), // History index
               ),
             ],
           ),
@@ -302,9 +305,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _handleNavigation(BuildContext context, int index) {
-    // This will be improved to properly navigate between tabs
-    // For now, it just pops to home
-    Navigator.of(context).popUntil((route) => route.isFirst);
+  void _handleNavigation(int index) {
+    // Ask MainScreen to switch tabs if callback provided
+    if (widget.onNavigateToTab != null) {
+      widget.onNavigateToTab!(index);
+    }
   }
 }

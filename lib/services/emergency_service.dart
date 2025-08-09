@@ -10,9 +10,25 @@ class EmergencyService {
   static String get apiBaseUrl => dotenv.env['API_BASE_URL'] ?? '';
   static String get apiKey => dotenv.env['API_KEY'] ?? '';
 
+  // Optional image URL per type from env, e.g. EMERGENCY_IMAGE_MEDICAL, etc.
+  static String? imageUrlForType(EmergencyType type) {
+    switch (type) {
+      case EmergencyType.medical:
+        return dotenv.env['EMERGENCY_IMAGE_MEDICAL'];
+      case EmergencyType.fire:
+        return dotenv.env['EMERGENCY_IMAGE_FIRE'];
+      case EmergencyType.crime:
+        return dotenv.env['EMERGENCY_IMAGE_CRIME'];
+      case EmergencyType.disaster:
+        return dotenv.env['EMERGENCY_IMAGE_DISASTER'];
+    }
+  }
+
   static Future<bool> sendEmergencyAlert({
     required EmergencyType type,
     String? additionalInfo,
+    String? imageUrl,
+    String? imageBase64,
   }) async {
     try {
       // Get current location
@@ -32,7 +48,14 @@ class EmergencyService {
 
       // Send to API (if available)
       if (apiBaseUrl.isNotEmpty && apiKey.isNotEmpty) {
-        await _sendToAPI(emergency, position, address, additionalInfo);
+        await _sendToAPI(
+          emergency,
+          position,
+          address,
+          additionalInfo,
+          imageUrl ?? imageUrlForType(type),
+          imageBase64,
+        );
       }
 
       // Send notification
@@ -53,6 +76,8 @@ class EmergencyService {
     position,
     String address,
     String? additionalInfo,
+    String? imageUrl,
+    String? imageBase64,
   ) async {
     try {
       final url = Uri.parse('$apiBaseUrl/emergency');
@@ -65,18 +90,23 @@ class EmergencyService {
         'id': emergency.id,
         'type': emergency.type.name,
         'timestamp': emergency.dateTime.toIso8601String(),
+        // include raw coordinates fields as well for convenience
+        'latitude': position?.latitude,
+        'longitude': position?.longitude,
         'location': {
           'latitude': position?.latitude,
           'longitude': position?.longitude,
           'address': address,
         },
         'additionalInfo': additionalInfo,
+        'image': imageUrl, // optional image URL
+        'imageBase64': imageBase64, // optional inlined image
         'status': emergency.status.name,
       });
 
       final response = await http.post(url, headers: headers, body: body);
 
-      if (response.statusCode != 200) {
+      if (response.statusCode < 200 || response.statusCode >= 300) {
         print('Failed to send to API: ${response.statusCode}');
       }
     } catch (e) {
