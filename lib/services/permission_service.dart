@@ -5,6 +5,9 @@ class PermissionService {
   // Request all core permissions used in the app at startup
   static Future<Map<Permission, PermissionStatus>>
       requestAllRequiredPermissions() async {
+    await Permission.locationWhenInUse.request();
+    await Permission.locationAlways.request();
+
     final List<Permission> permissions = [
       // Location
       Permission.location,
@@ -13,11 +16,11 @@ class PermissionService {
       if (Platform.isIOS) Permission.photos else Permission.storage,
       // Notifications (Android 13+/iOS)
       Permission.notification,
+      Permission.locationWhenInUse
     ];
 
     final results = await permissions.request();
 
-    // On Android 13+, photos maps to READ_MEDIA_IMAGES; request explicitly if needed
     if (Platform.isAndroid && (await Permission.photos.status).isDenied) {
       await Permission.photos.request();
     }
@@ -45,7 +48,9 @@ class PermissionService {
   // Helper for gallery/media access depending on platform
   static Future<bool> ensureGalleryPermission() async {
     if (Platform.isIOS) {
-      // iOS 14+ uses PHPicker which doesn't require Photos permission to pick
+      final photosStatus = await Permission.photos.status;
+      if (photosStatus.isGranted) return true;
+
       return true;
     } else {
       // On Android 13+, Permission.photos maps to READ_MEDIA_IMAGES

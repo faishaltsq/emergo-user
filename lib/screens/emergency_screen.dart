@@ -23,7 +23,6 @@ class EmergencyScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Location card (placeholder)
             const Card(
               child: Padding(
                 padding: EdgeInsets.all(16),

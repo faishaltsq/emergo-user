@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:emergo/widgets/app_bar_widget.dart';
+import 'package:provider/provider.dart';
+import '../providers/user_provider.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -12,7 +14,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _silentMode = false;
   bool _shakeToSOS = false;
   bool _notifications = true;
-  
+
   final _nameController = TextEditingController(text: 'John Doe');
   final _phoneController = TextEditingController(text: '+1 234 567 8900');
   final _emailController = TextEditingController(text: 'john.doe@email.com');
@@ -27,147 +29,256 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final userProvider = context.watch<UserProvider>();
+
+    // Sync text fields with provider when logged in
+    if (userProvider.isLoggedIn) {
+      _nameController.text = userProvider.name;
+      _phoneController.text = userProvider.phone;
+      _emailController.text = userProvider.email;
+    }
+
     return Scaffold(
       appBar: const AppBarWidget(title: 'Settings'),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Profile settings
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.person, color: Colors.grey.shade700),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Profile Settings',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Profile settings or Login prompt
+                  if (!userProvider.isLoggedIn)
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.info_outline,
+                                color: Colors.orange),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'You are logged out',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Please login to manage your profile and emergency settings.',
+                                    style:
+                                        TextStyle(color: Colors.grey.shade700),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Align(
+                                    alignment: Alignment.bottomLeft,
+                                    child: ElevatedButton(
+                                      style: ButtonStyle(
+                                        elevation: WidgetStateProperty
+                                            .resolveWith<double>((states) {
+                                          if (states.contains(
+                                                  WidgetState.hovered) ||
+                                              states.contains(
+                                                  WidgetState.pressed) ||
+                                              states.contains(
+                                                  WidgetState.focused)) {
+                                            return 8.0; // higher shadow on hover/press
+                                          }
+                                          return 2.0; // default subtle shadow
+                                        }),
+                                        shadowColor: WidgetStateProperty.all(
+                                            Colors.black54),
+                                        shape: WidgetStateProperty.all(
+                                          RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                        ),
+                                      ),
+                                      onPressed: () {
+                                        Navigator.pushNamed(context, '/auth');
+                                      },
+                                      child: const Text('Go to Login'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      controller: _nameController,
-                      label: 'Full Name',
-                      icon: Icons.badge,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      controller: _phoneController,
-                      label: 'Phone Number',
-                      icon: Icons.phone,
-                      keyboardType: TextInputType.phone,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      controller: _emailController,
-                      label: 'Email Address',
-                      icon: Icons.email,
-                      keyboardType: TextInputType.emailAddress,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // Emergency settings
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Emergency Settings',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                      ),
+                    )
+                  else
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.person, color: Colors.grey.shade700),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  'Profile Settings',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            _buildTextField(
+                              controller: _nameController,
+                              label: 'Full Name',
+                              icon: Icons.badge,
+                            ),
+                            const SizedBox(height: 16),
+                            _buildTextField(
+                              controller: _phoneController,
+                              label: 'Phone Number',
+                              icon: Icons.phone,
+                              keyboardType: TextInputType.phone,
+                            ),
+                            const SizedBox(height: 16),
+                            _buildTextField(
+                              controller: _emailController,
+                              label: 'Email Address',
+                              icon: Icons.email,
+                              keyboardType: TextInputType.emailAddress,
+                            ),
+                            const SizedBox(height: 12),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: ElevatedButton.icon(
+                                onPressed: () {
+                                  userProvider.updateProfile(
+                                    name: _nameController.text,
+                                    phone: _phoneController.text,
+                                    email: _emailController.text,
+                                  );
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                        content: Text('Profile saved')),
+                                  );
+                                },
+                                icon: const Icon(Icons.save),
+                                label: const Text('Save'),
+                              ),
+                            )
+                          ],
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    _buildSwitchSetting(
-                      icon: Icons.volume_off,
-                      title: 'Silent SOS Mode',
-                      subtitle: 'Send alerts without sound',
-                      value: _silentMode,
-                      onChanged: (value) {
-                        setState(() {
-                          _silentMode = value;
-                        });
-                      },
-                    ),
-                    const Divider(),
-                    _buildSwitchSetting(
-                      icon: Icons.smartphone,
-                      title: 'Shake-to-SOS',
-                      subtitle: 'Activate SOS by shaking phone',
-                      value: _shakeToSOS,
-                      onChanged: (value) {
-                        setState(() {
-                          _shakeToSOS = value;
-                        });
-                      },
-                    ),
-                    const Divider(),
-                    _buildSwitchSetting(
-                      icon: Icons.notifications,
-                      title: 'Notification Reminders',
-                      subtitle: 'Remind to update emergency info',
-                      value: _notifications,
-                      onChanged: (value) {
-                        setState(() {
-                          _notifications = value;
-                        });
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // App info
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    Text(
-                      'EMERGO Emergency Response App',
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
+
+                  const SizedBox(height: 16),
+
+                  // Emergency settings
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Emergency Settings',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          _buildSwitchSetting(
+                            icon: Icons.volume_off,
+                            title: 'Silent SOS Mode',
+                            subtitle: 'Send alerts without sound',
+                            value: _silentMode,
+                            onChanged: (value) {
+                              setState(() {
+                                _silentMode = value;
+                              });
+                            },
+                          ),
+                          const Divider(),
+                          _buildSwitchSetting(
+                            icon: Icons.smartphone,
+                            title: 'Shake-to-SOS',
+                            subtitle: 'Activate SOS by shaking phone',
+                            value: _shakeToSOS,
+                            onChanged: (value) {
+                              setState(() {
+                                _shakeToSOS = value;
+                              });
+                            },
+                          ),
+                          const Divider(),
+                          _buildSwitchSetting(
+                            icon: Icons.notifications,
+                            title: 'Notification Reminders',
+                            subtitle: 'Remind to update emergency info',
+                            value: _notifications,
+                            onChanged: (value) {
+                              setState(() {
+                                _notifications = value;
+                              });
+                            },
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Version 1.0.0',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  if (userProvider.isLoggedIn)
+                    Center(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          context.read<UserProvider>().logout();
+                        },
+                        icon: const Icon(Icons.logout),
+                        label: const Text('Log out'),
                       ),
                     ),
-                  ],
-                ),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+
+          // App info at the very bottom just above nav
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'EMERGO Emergency Response App',
+                    style: TextStyle(color: Colors.grey.shade600),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Version 1.0.0',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
-  
+
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
@@ -183,7 +294,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
   }
-  
+
   Widget _buildSwitchSetting({
     required IconData icon,
     required String title,
@@ -218,7 +329,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: Theme.of(context).primaryColor,
+            activeColor: Theme.of(context).colorScheme.primary,
           ),
         ],
       ),
