@@ -73,7 +73,8 @@ class AuthService {
     required String password,
     required String fullName,
   }) async {
-    final uri = Uri.parse('$_baseUrl/auth/register'); // Provided by curl example
+    final uri =
+        Uri.parse('$_baseUrl/auth/register'); // Provided by curl example
     final res = await http.post(
       uri,
       headers: const {
@@ -104,7 +105,9 @@ class AuthService {
           if (detail is List) {
             final msgs = detail
                 .map((e) => e is Map && e['msg'] != null
-                    ? (e['loc'] != null ? '${e['msg']} (${e['loc']})' : e['msg'])
+                    ? (e['loc'] != null
+                        ? '${e['msg']} (${e['loc']})'
+                        : e['msg'])
                     : e.toString())
                 .join('; ');
             throw AuthException('Validation failed: $msgs');

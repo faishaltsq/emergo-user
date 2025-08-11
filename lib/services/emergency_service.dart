@@ -5,10 +5,20 @@ import 'package:emergo/models/emergency_event.dart';
 import 'package:emergo/services/location_service.dart';
 import 'package:emergo/services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/incident.dart';
 
 class EmergencyService {
-  static String get apiBaseUrl => dotenv.env['API_BASE_URL'] ?? '';
-  static String get apiKey => dotenv.env['API_KEY'] ?? '';
+  // Normalize base URL similar to AuthService
+  static String get _baseUrl {
+    final fromEnv = dotenv.env['API_BASE_URL']?.trim();
+    var url = (fromEnv == null || fromEnv.isEmpty)
+        ? 'http://127.0.0.1:8000'
+        : fromEnv;
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'http://$url';
+    }
+    return url.replaceAll(RegExp(r'/+$'), '');
+  }
 
   // Optional image URL per type from env, e.g. EMERGENCY_IMAGE_MEDICAL, etc.
   static String? imageUrlForType(EmergencyType type) {
@@ -33,9 +43,11 @@ class EmergencyService {
     try {
       // Get current location
       final position = await LocationService.getCurrentPosition();
-      final address = await LocationService.getCurrentAddress();
+      if (position == null) {
+        throw Exception('Unable to get current location');
+      }
 
-      // Create emergency event
+      // Create emergency event (local history + UX)
       final emergency = EmergencyEvent(
         id: DateTime.now().millisecondsSinceEpoch,
         type: type,
@@ -46,19 +58,14 @@ class EmergencyService {
       // Save to local storage
       await _saveEmergencyToLocal(emergency);
 
-      // Send to API (if available)
-      if (apiBaseUrl.isNotEmpty && apiKey.isNotEmpty) {
-        await _sendToAPI(
-          emergency,
-          position,
-          address,
-          additionalInfo,
-          imageUrl ?? imageUrlForType(type),
-          imageBase64,
-        );
-      }
+      // Send to backend API using authenticated user token
+      await _sendToIncidentsAPI(
+        incidentTypeId: _incidentTypeIdFor(type),
+        latitude: position.latitude,
+        longitude: position.longitude,
+      );
 
-      // Send notification
+      // Local notification confirmation
       await NotificationService.showEmergencyNotification(
         title: 'Emergency Alert Sent',
         body: 'Your ${type.name} emergency alert has been sent successfully.',
@@ -71,46 +78,58 @@ class EmergencyService {
     }
   }
 
-  static Future<void> _sendToAPI(
-    EmergencyEvent emergency,
-    position,
-    String address,
-    String? additionalInfo,
-    String? imageUrl,
-    String? imageBase64,
-  ) async {
+  static Future<void> _sendToIncidentsAPI({
+    required int incidentTypeId,
+    required double latitude,
+    required double longitude,
+  }) async {
     try {
-      final url = Uri.parse('$apiBaseUrl/emergency');
-      final headers = {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token');
+      final tokenType = prefs.getString('token_type') ?? 'Bearer';
+      if (token == null || token.isEmpty) {
+        throw Exception('User not authenticated');
+      }
+
+      final uri = Uri.parse('$_baseUrl/users/me/incidents');
+      final headers = <String, String>{
+        'accept': 'application/json',
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer $apiKey',
+        'Authorization': '$tokenType $token',
       };
 
-      final body = json.encode({
-        'id': emergency.id,
-        'type': emergency.type.name,
-        'timestamp': emergency.dateTime.toIso8601String(),
-        // include raw coordinates fields as well for convenience
-        'latitude': position?.latitude,
-        'longitude': position?.longitude,
-        'location': {
-          'latitude': position?.latitude,
-          'longitude': position?.longitude,
-          'address': address,
-        },
-        'additionalInfo': additionalInfo,
-        'image': imageUrl, // optional image URL
-        'imageBase64': imageBase64, // optional inlined image
-        'status': emergency.status.name,
+      final body = jsonEncode({
+        'incidenttypeid': incidentTypeId,
+        'latitude': latitude,
+        'longitude': longitude,
       });
 
-      final response = await http.post(url, headers: headers, body: body);
-
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        print('Failed to send to API: ${response.statusCode}');
+      final res = await http.post(uri, headers: headers, body: body);
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        // Try to log server-provided error
+        try {
+          final parsed = jsonDecode(res.body);
+          print('Incident submit failed: ${res.statusCode} - $parsed');
+        } catch (_) {
+          print('Incident submit failed: ${res.statusCode}');
+        }
+        throw Exception('Incident API error ${res.statusCode}');
       }
     } catch (e) {
-      print('Error sending to API: $e');
+      rethrow;
+    }
+  }
+
+  static int _incidentTypeIdFor(EmergencyType type) {
+    switch (type) {
+      case EmergencyType.medical:
+        return 1; // Darurat Medis
+      case EmergencyType.fire:
+        return 2; // Kebakaran
+      case EmergencyType.crime:
+        return 3; // Kriminal
+      case EmergencyType.disaster:
+        return 4; // Bencana alam
     }
   }
 
@@ -192,6 +211,55 @@ class EmergencyService {
       await prefs.remove('emergency_history');
     } catch (e) {
       print('Error clearing history: $e');
+    }
+  }
+
+  // Remote incidents history for the authenticated user
+  static Future<List<Incident>> fetchIncidents() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token');
+      final tokenType = prefs.getString('token_type') ?? 'Bearer';
+      if (token == null || token.isEmpty) {
+        throw Exception('Unauthenticated');
+      }
+
+      final uri = Uri.parse('$_baseUrl/users/me/incidents');
+      final res = await http.get(
+        uri,
+        headers: {
+          'accept': 'application/json',
+          'Authorization': '$tokenType $token',
+        },
+      );
+
+      if (res.statusCode == 200) {
+        final parsed = jsonDecode(res.body);
+        if (parsed is List) {
+          return parsed
+              .whereType<Map<String, dynamic>>()
+              .map((e) => Incident.fromJson(e))
+              .toList();
+        }
+        // If server returns an object, try to unwrap array-like key
+        if (parsed is Map && parsed['items'] is List) {
+          return (parsed['items'] as List)
+              .whereType<Map<String, dynamic>>()
+              .map((e) => Incident.fromJson(e))
+              .toList();
+        }
+        throw Exception('Unexpected history response');
+      }
+
+      // Try extract server error
+      try {
+        final body = jsonDecode(res.body);
+        throw Exception('History error ${res.statusCode}: $body');
+      } catch (_) {
+        throw Exception('History error ${res.statusCode}');
+      }
+    } catch (e) {
+      rethrow;
     }
   }
 }

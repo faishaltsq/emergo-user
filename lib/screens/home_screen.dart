@@ -46,10 +46,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-  final settings = context.watch<SettingsProvider>();
-  final bool isShakeEnabled = settings.isInitialized
-    ? settings.shakeToSOSEnabled
-    : true; // default on until loaded
+    final settings = context.watch<SettingsProvider>();
+    final bool isShakeEnabled = settings.isInitialized
+        ? settings.shakeToSOSEnabled
+        : true; // default on until loaded
 
     return Scaffold(
       appBar: const AppBarWidget(title: 'EMERGO'),
@@ -113,17 +113,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
               // Emergency status card (dynamic based on settings)
               Card(
-                color: isShakeEnabled
-                    ? Colors.green.shade50
-                    : Colors.red.shade50,
+                color:
+                    isShakeEnabled ? Colors.green.shade50 : Colors.red.shade50,
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Row(
                     children: [
                       Icon(
-            isShakeEnabled
-              ? Icons.shield_rounded
-              : Icons.shield_outlined,
+                        isShakeEnabled
+                            ? Icons.shield_rounded
+                            : Icons.shield_outlined,
                         color: isShakeEnabled
                             ? Colors.green.shade700
                             : Colors.red.shade700,

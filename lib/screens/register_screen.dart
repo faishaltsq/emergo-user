@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/user_provider.dart';
+import '../main.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -159,9 +160,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
     if (!mounted) return;
     if (success) {
-      // Provider already saved token; AuthScreen will auto-close on isLoggedIn.
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Registration successful')),
+      );
+      // Navigate to home screen and clear navigation stack
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const MainScreen()),
+        (route) => false,
       );
     } else {
       final msg = user.error ?? 'Registration failed';
