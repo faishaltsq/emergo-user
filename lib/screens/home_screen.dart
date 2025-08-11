@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:emergo/widgets/app_bar_widget.dart';
 import 'package:emergo/screens/emergency_screen.dart';
 import 'package:emergo/services/location_service.dart';
+import 'package:emergo/services/emergency_service.dart';
 import 'package:provider/provider.dart';
 import '../providers/settings_provider.dart';
 
@@ -18,11 +19,14 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   String _currentLocation = 'Getting location...';
   bool _isLoadingLocation = true;
+  bool _hasActiveEmergency = false;
+  bool _isCheckingEmergency = false;
 
   @override
   void initState() {
     super.initState();
-    _getCurrentLocation();
+  _getCurrentLocation();
+  _checkActiveEmergency();
   }
 
   Future<void> _getCurrentLocation() async {
@@ -44,6 +48,38 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _checkActiveEmergency() async {
+    setState(() {
+      _isCheckingEmergency = true;
+    });
+    try {
+      final incidents = await EmergencyService.fetchIncidents();
+      // Consider any incident with statusId != 4 as active/in-progress
+      final hasActive = incidents.any((i) => i.statusId != 4);
+      if (mounted) {
+        setState(() {
+          _hasActiveEmergency = hasActive;
+          _isCheckingEmergency = false;
+        });
+      }
+    } catch (e) {
+      // On error (e.g., unauthenticated), default to showing the SOS button
+      if (mounted) {
+        setState(() {
+          _hasActiveEmergency = false;
+          _isCheckingEmergency = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _refreshAll() async {
+    await Future.wait([
+      _getCurrentLocation(),
+      _checkActiveEmergency(),
+    ]);
+  }
+
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
@@ -54,7 +90,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: const AppBarWidget(title: 'EMERGO'),
       body: RefreshIndicator(
-        onRefresh: _getCurrentLocation,
+  onRefresh: _refreshAll,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(16),
@@ -168,68 +204,97 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
 
-              // SOS Button
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 40),
-                  child: InkWell(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const EmergencyScreen(),
-                        ),
-                      );
-                    },
-                    child: Container(
-                      width: 160,
-                      height: 160,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: RadialGradient(
-                          colors: [
-                            Colors.red.shade400,
-                            Colors.red.shade700,
-                          ],
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.red.withOpacity(0.3),
-                            blurRadius: 20,
-                            spreadRadius: 5,
+              // SOS Button (hidden if there's an active emergency request)
+              if (!_hasActiveEmergency)
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 40),
+                    child: InkWell(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const EmergencyScreen(),
                           ),
-                        ],
-                      ),
-                      child: const Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              'SOS',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 32,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 2,
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'EMERGENCY',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                letterSpacing: 1,
-                              ),
+                        );
+                      },
+                      child: Container(
+                        width: 160,
+                        height: 160,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: RadialGradient(
+                            colors: [
+                              Colors.red.shade400,
+                              Colors.red.shade700,
+                            ],
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.red.withOpacity(0.3),
+                              blurRadius: 20,
+                              spreadRadius: 5,
                             ),
                           ],
+                        ),
+                        child: const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                'SOS',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 2,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'EMERGENCY',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  letterSpacing: 1,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
+              if (_hasActiveEmergency)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: Card(
+                    color: Colors.orange.shade50,
+                    child: ListTile(
+                      leading: Icon(
+                        Icons.warning_amber_rounded,
+                        color: Colors.orange.shade700,
+                      ),
+                      title: const Text(
+                        'Emergency in progress',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: const Text(
+                        'You have an active emergency request. SOS is disabled until it is resolved.',
+                      ),
+                      trailing: _isCheckingEmergency
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const SizedBox.shrink(),
+                      onTap: () => _handleNavigation(3), // Go to History
+                    ),
+                  ),
+                ),
 
               // Quick access buttons
               _quickAccessButton(

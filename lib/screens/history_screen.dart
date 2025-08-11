@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:emergo/widgets/app_bar_widget.dart';
 import 'package:emergo/models/emergency_event.dart';
@@ -14,15 +15,85 @@ class HistoryScreen extends StatefulWidget {
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
+  // Backing future for the incidents list
   late Future<List<Incident>> _future;
 
+  // Periodic poller to refresh incidents in the background while screen is visible
+  Timer? _refreshTimer;
+  UserProvider? _userProvider;
+
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final isAuthed = context.read<UserProvider>().isLoggedIn;
-    if (isAuthed) {
-      _future = EmergencyService.fetchIncidents();
+  void initState() {
+    super.initState();
+    // Safe default to prevent late initialization issues before first fetch
+    _future = Future.value(const <Incident>[]);
+
+    // Defer provider wiring until after first frame to ensure context is ready
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _userProvider = context.read<UserProvider>();
+
+      // Initial fetch if already authenticated
+      if (_userProvider!.isLoggedIn) {
+        _refresh(now: true);
+        _startPolling();
+      }
+
+      // Listen for auth state changes to start/stop polling
+      _userProvider!.addListener(_onUserChanged);
+    });
+  }
+
+  void _onUserChanged() {
+    if (!mounted || _userProvider == null) return;
+    final authed = _userProvider!.isLoggedIn;
+    if (authed) {
+      _refresh(now: true);
+      _startPolling();
+    } else {
+      _stopPolling();
+      setState(() {
+        _future = Future.value(const <Incident>[]);
+      });
     }
+  }
+
+  void _startPolling() {
+    _refreshTimer?.cancel();
+    // Poll every 20 seconds; adjust as needed
+    _refreshTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+      if (!mounted) return;
+      // Only refresh when authenticated
+      final authed = _userProvider?.isLoggedIn ?? false;
+      if (authed) {
+        _refresh();
+      }
+    });
+  }
+
+  void _stopPolling() {
+    _refreshTimer?.cancel();
+    _refreshTimer = null;
+  }
+
+  Future<void> _refresh({bool now = false}) async {
+    // Reassign the future to trigger FutureBuilder rebuild
+    setState(() {
+      _future = EmergencyService.fetchIncidents();
+    });
+    if (now) {
+      // Optionally await to settle initial UI faster
+      try {
+        await _future;
+      } catch (_) {/* handled by FutureBuilder */}
+    }
+  }
+
+  @override
+  void dispose() {
+    _stopPolling();
+    _userProvider?.removeListener(_onUserChanged);
+    super.dispose();
   }
 
   @override
@@ -53,66 +124,71 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   if (items.isEmpty) {
                     return const Center(child: Text('No incidents yet'));
                   }
-                  return ListView.builder(
-                    itemCount: items.length,
-                    itemBuilder: (context, index) {
-                      final it = items[index];
-                      final type = _typeFromIncident(it.incidentTypeId);
-                      final status = _statusFromId(it.statusId);
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 48,
-                                height: 48,
-                                decoration: BoxDecoration(
-                                  color:
-                                      _getEmergencyColor(type).withOpacity(0.1),
-                                  shape: BoxShape.circle,
+                  return RefreshIndicator(
+                    onRefresh: _refresh,
+                    child: ListView.builder(
+                      itemCount: items.length,
+                      itemBuilder: (context, index) {
+                        final it = items[index];
+                        final type = _typeFromIncident(it.incidentTypeId);
+                        final status = _statusFromId(it.statusId);
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 48,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    color: _getEmergencyColor(type)
+                                        .withOpacity(0.1),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    _iconForType(type),
+                                    color: _getEmergencyColor(type),
+                                  ),
                                 ),
-                                child: Icon(
-                                  _iconForType(type),
-                                  color: _getEmergencyColor(type),
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      it.incidentTypeName,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w500,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Row(
-                                      children: [
-                                        const Icon(Icons.access_time, size: 14),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          '${_formatDate(it.date)} at ${_formatTime(it.date)}',
-                                          style: TextStyle(
-                                            color: Colors.grey.shade600,
-                                            fontSize: 14,
-                                          ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        it.incidentTypeName,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w500,
+                                          fontSize: 16,
                                         ),
-                                      ],
-                                    ),
-                                  ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.access_time,
+                                              size: 14),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            '${_formatDate(it.date)} at ${_formatTime(it.date)}',
+                                            style: TextStyle(
+                                              color: Colors.grey.shade600,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              _buildStatusBadge(context, status),
-                            ],
+                                _buildStatusBadge(context, status),
+                              ],
+                            ),
                           ),
-                        ),
-                      );
-                    },
+                        );
+                      },
+                    ),
                   );
                 },
               )
