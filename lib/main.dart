@@ -16,6 +16,7 @@ import './services/permission_service.dart';
 import 'providers/user_provider.dart';
 import 'screens/auth_screen.dart';
 import 'screens/register_screen.dart';
+import 'providers/settings_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -37,18 +38,43 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ContactsProvider()),
-        ChangeNotifierProvider(create: (_) => UserProvider()),
+  ChangeNotifierProvider(create: (_) => UserProvider()),
+  ChangeNotifierProvider(create: (_) => SettingsProvider()),
       ],
       child: MaterialApp(
         title: 'EMERGO',
         theme: AppTheme.lightTheme,
         debugShowCheckedModeBanner: false,
-        home: const MainScreen(),
+        home: const _Bootstrapper(),
         routes: {
           '/auth': (context) => const AuthScreen(),
           '/register': (context) => const RegisterScreen(),
         },
       ),
+    );
+  }
+}
+
+class _Bootstrapper extends StatelessWidget {
+  const _Bootstrapper();
+
+  @override
+  Widget build(BuildContext context) {
+    final userProvider = context.read<UserProvider>();
+    final settingsProvider = context.read<SettingsProvider>();
+    return FutureBuilder(
+      future: Future.wait([
+        userProvider.initialize(),
+        settingsProvider.initialize(),
+      ]),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        return const MainScreen();
+      },
     );
   }
 }
@@ -117,12 +143,16 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   }
 
   void _initializeShakeDetection() {
-    ShakeDetectionService.startListening(
-      onShakeDetected: () {
-        // Show emergency dialog when shake is detected
-        _showShakeEmergencyDialog();
-      },
-    );
+    final settings = context.read<SettingsProvider>();
+    if (settings.isInitialized && settings.shakeToSOSEnabled) {
+      ShakeDetectionService.startListening(
+        onShakeDetected: () {
+          _showShakeEmergencyDialog();
+        },
+      );
+    } else {
+      ShakeDetectionService.stopListening();
+    }
   }
 
   void _showShakeEmergencyDialog() {

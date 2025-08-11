@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:emergo/widgets/app_bar_widget.dart';
 import 'package:provider/provider.dart';
 import '../providers/user_provider.dart';
+import '../providers/settings_provider.dart';
+import '../services/shake_detection_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -14,6 +16,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _silentMode = false;
   bool _shakeToSOS = false;
   bool _notifications = true;
+  bool _hydrated = false;
 
   final _nameController = TextEditingController(text: 'John Doe');
   final _phoneController = TextEditingController(text: '+1 234 567 8900');
@@ -30,6 +33,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final userProvider = context.watch<UserProvider>();
+    final settings = context.watch<SettingsProvider>();
+
+    // Hydrate local state from provider once
+    if (!_hydrated && settings.isInitialized) {
+      _silentMode = settings.silentMode;
+      _shakeToSOS = settings.shakeToSOSEnabled;
+      _notifications = settings.notificationsEnabled;
+      _hydrated = true;
+      // Ensure shake listener matches persisted state
+      if (_shakeToSOS && !ShakeDetectionService.isEnabled) {
+        ShakeDetectionService.startListening();
+      } else if (!_shakeToSOS && ShakeDetectionService.isEnabled) {
+        ShakeDetectionService.stopListening();
+      }
+    }
 
     // Sync text fields with provider when logged in
     if (userProvider.isLoggedIn) {
@@ -202,9 +220,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             subtitle: 'Send alerts without sound',
                             value: _silentMode,
                             onChanged: (value) {
-                              setState(() {
-                                _silentMode = value;
-                              });
+                              setState(() => _silentMode = value);
+                              context
+                                  .read<SettingsProvider>()
+                                  .setSilentMode(value);
                             },
                           ),
                           const Divider(),
@@ -214,9 +233,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             subtitle: 'Activate SOS by shaking phone',
                             value: _shakeToSOS,
                             onChanged: (value) {
-                              setState(() {
-                                _shakeToSOS = value;
-                              });
+                              setState(() => _shakeToSOS = value);
+                              context
+                                  .read<SettingsProvider>()
+                                  .setShakeToSOSEnabled(value);
+                              if (value) {
+                                ShakeDetectionService.startListening(
+                                  onShakeDetected: () {
+                                    // No-op here; MainScreen supplies action
+                                  },
+                                );
+                              } else {
+                                ShakeDetectionService.stopListening();
+                              }
                             },
                           ),
                           const Divider(),
@@ -226,9 +255,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             subtitle: 'Remind to update emergency info',
                             value: _notifications,
                             onChanged: (value) {
-                              setState(() {
-                                _notifications = value;
-                              });
+                              setState(() => _notifications = value);
+                              context
+                                  .read<SettingsProvider>()
+                                  .setNotificationsEnabled(value);
                             },
                           ),
                         ],
