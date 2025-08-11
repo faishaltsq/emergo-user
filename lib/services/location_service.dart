@@ -10,6 +10,8 @@ class LocationService {
 
   static Future<bool> requestLocationPermission() async {
     final status = await Permission.location.request();
+    // await Permission.locationAlways.request();
+    await Permission.locationWhenInUse.request();
     return status == PermissionStatus.granted;
   }
 

@@ -43,3 +43,11 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+#env
+.env
+
+# Local configuration files & VS Code settings
+*.local
+*.code-workspace
+.vscode/

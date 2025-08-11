@@ -13,6 +13,9 @@ import './screens/emergency_screen.dart';
 import './services/notification_service.dart';
 import './services/shake_detection_service.dart';
 import './services/permission_service.dart';
+import 'providers/user_provider.dart';
+import 'screens/auth_screen.dart';
+import 'screens/register_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -34,12 +37,17 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ContactsProvider()),
+        ChangeNotifierProvider(create: (_) => UserProvider()),
       ],
       child: MaterialApp(
         title: 'EMERGO',
         theme: AppTheme.lightTheme,
         debugShowCheckedModeBanner: false,
         home: const MainScreen(),
+        routes: {
+          '/auth': (context) => const AuthScreen(),
+          '/register': (context) => const RegisterScreen(),
+        },
       ),
     );
   }
