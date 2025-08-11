@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:emergo/widgets/app_bar_widget.dart';
 import 'package:emergo/screens/emergency_screen.dart';
 import 'package:emergo/services/location_service.dart';
+import 'package:provider/provider.dart';
+import '../providers/settings_provider.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, this.onNavigateToTab});
@@ -44,6 +46,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+  final settings = context.watch<SettingsProvider>();
+  final bool isShakeEnabled = settings.isInitialized
+    ? settings.shakeToSOSEnabled
+    : true; // default on until loaded
+
     return Scaffold(
       appBar: const AppBarWidget(title: 'EMERGO'),
       body: RefreshIndicator(
@@ -104,16 +111,22 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
 
-              // Emergency status card
+              // Emergency status card (dynamic based on settings)
               Card(
-                color: Colors.green.shade50,
+                color: isShakeEnabled
+                    ? Colors.green.shade50
+                    : Colors.red.shade50,
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Row(
                     children: [
                       Icon(
-                        Icons.shield_rounded,
-                        color: Colors.green.shade700,
+            isShakeEnabled
+              ? Icons.shield_rounded
+              : Icons.shield_outlined,
+                        color: isShakeEnabled
+                            ? Colors.green.shade700
+                            : Colors.red.shade700,
                         size: 24,
                       ),
                       const SizedBox(width: 12),
@@ -122,22 +135,35 @@ class _HomeScreenState extends State<HomeScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Emergency Services Active',
+                              isShakeEnabled
+                                  ? 'Emergency Services Active'
+                                  : 'Emergency Services Disabled',
                               style: TextStyle(
                                 fontWeight: FontWeight.w600,
-                                color: Colors.green.shade800,
+                                color: isShakeEnabled
+                                    ? Colors.green.shade800
+                                    : Colors.red.shade800,
                               ),
                             ),
                             Text(
-                              'Shake detection enabled • GPS tracking on',
+                              isShakeEnabled
+                                  ? 'Shake detection enabled • GPS tracking on'
+                                  : 'Shake detection disabled • Enable in Settings',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.green.shade600,
+                                color: isShakeEnabled
+                                    ? Colors.green.shade600
+                                    : Colors.red.shade600,
                               ),
                             ),
                           ],
                         ),
                       ),
+                      if (!isShakeEnabled)
+                        TextButton(
+                          onPressed: () => _handleNavigation(4), // Settings
+                          child: const Text('Enable'),
+                        ),
                     ],
                   ),
                 ),

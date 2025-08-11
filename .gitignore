@@ -51,3 +51,4 @@ app.*.map.json
 *.local
 *.code-workspace
 .vscode/
+.env

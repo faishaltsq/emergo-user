@@ -13,6 +13,7 @@ class _AuthScreenState extends State<AuthScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _obscure = true;
 
   @override
   void dispose() {
@@ -23,6 +24,17 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // If user gets logged in (e.g., after successful registration), close this screen.
+    final userWatcher = context.watch<UserProvider>();
+    if (userWatcher.isLoggedIn) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (Navigator.canPop(context)) {
+          Navigator.pop(context);
+        }
+      });
+    }
+
     return Scaffold(
       appBar: AppBar(title: const Text('Login')),
       body: Center(
@@ -59,34 +71,47 @@ class _AuthScreenState extends State<AuthScreen> {
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: _passwordController,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Password',
-                        prefixIcon: Icon(Icons.lock_outline),
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        suffixIcon: IconButton(
+                          icon: Icon(_obscure
+                              ? Icons.visibility_off
+                              : Icons.visibility),
+                          onPressed: () {
+                            setState(() => _obscure = !_obscure);
+                          },
+                        ),
                       ),
-                      obscureText: true,
+                      obscureText: _obscure,
                       validator: (v) => (v == null || v.isEmpty)
                           ? 'Password is required'
                           : null,
-                      onFieldSubmitted: (_) {},
+                      onFieldSubmitted: (_) => _onLoginPressed(context),
                     ),
                     const SizedBox(height: 20),
-                    OutlinedButton(
-                      onPressed: () {
-                        if (!_formKey.currentState!.validate()) return;
-                        context.read<UserProvider>().login(
-                              email: _emailController.text.trim(),
-                            );
-                        Navigator.pop(context);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(56),
-                        textStyle: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
+                    Consumer<UserProvider>(
+                      builder: (context, user, _) => OutlinedButton(
+                        onPressed: user.isLoading
+                            ? null
+                            : () => _onLoginPressed(context),
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(56),
+                          textStyle: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          elevation: 3,
                         ),
-                        elevation: 3,
+                        child: user.isLoading
+                            ? const SizedBox(
+                                height: 24,
+                                width: 24,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Text('Login'),
                       ),
-                      child: const Text('Login'),
                     ),
                   ],
                 ),
@@ -113,5 +138,26 @@ class _AuthScreenState extends State<AuthScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _onLoginPressed(BuildContext context) async {
+    if (!_formKey.currentState!.validate()) return;
+    final user = context.read<UserProvider>();
+    final success = await user.loginWithEmailPassword(
+      email: _emailController.text.trim(),
+      password: _passwordController.text,
+    );
+    if (!mounted) return;
+    if (success) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Logged in')),
+      );
+    } else {
+      final msg = user.error ?? 'Login failed';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg)),
+      );
+    }
   }
 }
