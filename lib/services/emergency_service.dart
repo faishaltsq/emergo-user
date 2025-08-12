@@ -262,4 +262,23 @@ class EmergencyService {
       rethrow;
     }
   }
+
+  // Background-safe helper: returns false without doing a network call
+  // when unauthenticated or token is empty. Otherwise, checks incidents
+  // and returns true if any has statusId != 4 (active/in-progress).
+  static Future<bool> hasActiveEmergencyIfAuthenticated() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token');
+      if (token == null || token.isEmpty) {
+        // Skip background call entirely if unauthenticated
+        return false;
+      }
+      final incidents = await fetchIncidents();
+      return incidents.any((i) => i.statusId != 4);
+    } catch (_) {
+      // On any error during background check, fail-open (no active)
+      return false;
+    }
+  }
 }

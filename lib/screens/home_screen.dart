@@ -25,22 +25,25 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-  _getCurrentLocation();
-  _checkActiveEmergency();
+    _getCurrentLocation();
+    _checkActiveEmergency();
   }
 
   Future<void> _getCurrentLocation() async {
+    if (!mounted) return;
     setState(() {
       _isLoadingLocation = true;
     });
 
     try {
       final address = await LocationService.getCurrentAddress();
+      if (!mounted) return;
       setState(() {
         _currentLocation = address;
         _isLoadingLocation = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _currentLocation = 'Unable to get location';
         _isLoadingLocation = false;
@@ -49,13 +52,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _checkActiveEmergency() async {
+    if (!mounted) return;
     setState(() {
       _isCheckingEmergency = true;
     });
     try {
-      final incidents = await EmergencyService.fetchIncidents();
-      // Consider any incident with statusId != 4 as active/in-progress
-      final hasActive = incidents.any((i) => i.statusId != 4);
+      // Background-safe check that skips network calls when unauthenticated
+      final hasActive =
+          await EmergencyService.hasActiveEmergencyIfAuthenticated();
       if (mounted) {
         setState(() {
           _hasActiveEmergency = hasActive;
@@ -90,7 +94,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: const AppBarWidget(title: 'EMERGO'),
       body: RefreshIndicator(
-  onRefresh: _refreshAll,
+        onRefresh: _refreshAll,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(16),

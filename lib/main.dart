@@ -12,6 +12,7 @@ import './screens/settings_screen.dart';
 import './screens/emergency_screen.dart';
 import './services/notification_service.dart';
 import './services/shake_detection_service.dart';
+import './services/incident_watcher.dart';
 import './services/permission_service.dart';
 import 'providers/user_provider.dart';
 import 'screens/auth_screen.dart';
@@ -90,6 +91,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   int _currentIndex = 0;
 
   late final List<Widget> _screens;
+  late final SettingsProvider _settingsProvider;
+  late final UserProvider _userProvider;
 
   @override
   void initState() {
@@ -99,7 +102,11 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     // Request app-wide permissions on first run
     _requestStartupPermissions();
 
-    // Build screens so HomeScreen can request tab changes
+  // Cache providers for listeners
+  _settingsProvider = context.read<SettingsProvider>();
+  _userProvider = context.read<UserProvider>();
+
+  // Build screens so HomeScreen can request tab changes
     _screens = [
       HomeScreen(
         onNavigateToTab: (index) {
@@ -118,6 +125,13 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
     // Start shake detection when app starts
     _initializeShakeDetection();
+
+  // Start/stop incident watcher based on auth
+  _updateIncidentWatcher();
+
+  // Listen for settings/auth changes
+  _settingsProvider.addListener(_onSettingsChanged);
+  _userProvider.addListener(_onUserChanged);
   }
 
   Future<void> _requestStartupPermissions() async {
@@ -139,11 +153,14 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     ShakeDetectionService.stopListening();
+  IncidentWatcher.stop();
+  _settingsProvider.removeListener(_onSettingsChanged);
+  _userProvider.removeListener(_onUserChanged);
     super.dispose();
   }
 
   void _initializeShakeDetection() {
-    final settings = context.read<SettingsProvider>();
+    final settings = _settingsProvider;
     if (settings.isInitialized && settings.shakeToSOSEnabled) {
       ShakeDetectionService.startListening(
         onShakeDetected: () {
@@ -152,6 +169,33 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       );
     } else {
       ShakeDetectionService.stopListening();
+    }
+  }
+
+  void _onSettingsChanged() {
+    // React to shake setting toggles
+    _initializeShakeDetection();
+  }
+
+  void _onUserChanged() {
+    _updateIncidentWatcher();
+  }
+
+  void _updateIncidentWatcher() {
+    if (_userProvider.isLoggedIn) {
+      IncidentWatcher.start();
+    } else {
+      IncidentWatcher.stop();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      // Re-check settings on resume (some OEMs kill sensors on background)
+      _initializeShakeDetection();
+      _updateIncidentWatcher();
     }
   }
 
