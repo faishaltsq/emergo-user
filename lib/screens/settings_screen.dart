@@ -3,7 +3,6 @@ import 'package:emergo/widgets/app_bar_widget.dart';
 import 'package:provider/provider.dart';
 import '../providers/user_provider.dart';
 import '../providers/settings_provider.dart';
-import '../services/shake_detection_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -41,12 +40,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _shakeToSOS = settings.shakeToSOSEnabled;
       _notifications = settings.notificationsEnabled;
       _hydrated = true;
-      // Ensure shake listener matches persisted state
-      if (_shakeToSOS && !ShakeDetectionService.isEnabled) {
-        ShakeDetectionService.startListening();
-      } else if (!_shakeToSOS && ShakeDetectionService.isEnabled) {
-        ShakeDetectionService.stopListening();
-      }
+  // Shake listener lifecycle is managed centrally by MainScreen
     }
 
     // Sync text fields with provider when logged in
@@ -237,15 +231,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               context
                                   .read<SettingsProvider>()
                                   .setShakeToSOSEnabled(value);
-                              if (value) {
-                                ShakeDetectionService.startListening(
-                                  onShakeDetected: () {
-                                    // No-op here; MainScreen supplies action
-                                  },
-                                );
-                              } else {
-                                ShakeDetectionService.stopListening();
-                              }
+                              // MainScreen observes settings and manages shake listener
                             },
                           ),
                           const Divider(),

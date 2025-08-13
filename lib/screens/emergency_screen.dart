@@ -7,6 +7,8 @@ import 'package:emergo/models/emergency_event.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:emergo/services/permission_service.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:provider/provider.dart';
+import '../providers/user_provider.dart';
 
 class EmergencyScreen extends StatelessWidget {
   const EmergencyScreen({super.key});
@@ -329,6 +331,21 @@ class EmergencyScreen extends StatelessWidget {
                 ),
                 ElevatedButton.icon(
                   onPressed: () async {
+                    // Require authentication: if not logged in, go to login screen
+                    final isAuthed = context.read<UserProvider>().isLoggedIn;
+                    if (!isAuthed) {
+                      Navigator.of(ctx).pop();
+                      if (context.mounted) {
+                        Navigator.of(context).pushNamed('/auth');
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Please log in to submit an alert.'),
+                          ),
+                        );
+                      }
+                      return;
+                    }
+
                     // Ensure GPS and permission before sending
                     final ready = await ensureGpsEnabled(ctx);
                     if (!ready) return;
