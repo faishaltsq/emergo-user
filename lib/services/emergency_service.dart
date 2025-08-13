@@ -94,8 +94,8 @@ class EmergencyService {
         return false;
       }
 
-      // Test token by calling a simple endpoint - use /users/me as it's more reliable
-      final uri = Uri.parse('$_baseUrl/users/me');
+      // Test token by calling incident-types endpoint as it's more likely to work
+      final uri = Uri.parse('$_baseUrl/incident-types');
       final res = await http.get(
         uri,
         headers: {
@@ -143,8 +143,8 @@ class EmergencyService {
         throw Exception('User not authenticated');
       }
 
-      // Use the new endpoint format as requested
-      final uri = Uri.parse('$_baseUrl/incidents');
+      // Use the new endpoint format as requested - add trailing slash to avoid 307 redirect
+      final uri = Uri.parse('$_baseUrl/incidents/');
       print('Debug - Submitting to: $uri');
 
       // Test with JSON format first to ensure authentication works
@@ -155,12 +155,15 @@ class EmergencyService {
       };
 
       print('Debug - Headers: $headers');
+
+      // Try different field names that might be expected by the API
       final body = jsonEncode({
-        'incidenttypeid': incidentTypeId,
-        'latitude': latitude,
-        'longitude': longitude,
+        'incident_type_id': incidentTypeId, // snake_case version
+        'lat': latitude, // shorter field name
+        'lng': longitude, // shorter field name
         if (additionalInfo != null && additionalInfo.isNotEmpty)
           'description': additionalInfo,
+        'status': 'active', // Add default status
       });
 
       print('Debug - Body: $body');
