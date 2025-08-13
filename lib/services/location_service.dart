@@ -6,7 +6,16 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class LocationService {
-  static String get googleMapsApiKey => dotenv.env['GOOGLE_MAPS_API_KEY'] ?? '';
+  static String get googleMapsApiKey {
+    // Support both GOOGLE_MAPS_API_KEY and legacy MAPS_API_KEY
+    final key =
+        dotenv.env['GOOGLE_MAPS_API_KEY'] ?? dotenv.env['MAPS_API_KEY'] ?? '';
+    if (key.isEmpty) {
+      // ignore: avoid_print
+      print('Google Maps API key not set. Using mock facilities.');
+    }
+    return key;
+  }
 
   static Future<bool> requestLocationPermission() async {
     final status = await Permission.location.request();

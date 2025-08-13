@@ -281,17 +281,38 @@ class _MapScreenState extends State<MapScreen> {
                         child: SizedBox(
                           height: 260,
                           width: double.infinity,
-                          child: GoogleMap(
-                            onMapCreated: (c) => _mapController = c,
-                            initialCameraPosition: CameraPosition(
-                              target: _myLatLng!,
-                              zoom: 14,
-                            ),
-                            myLocationEnabled: true,
-                            myLocationButtonEnabled: true,
-                            markers: _markers,
-                            compassEnabled: true,
-                            zoomControlsEnabled: false,
+                          child: Builder(
+                            builder: (context) {
+                              try {
+                                if (_myLatLng == null) {
+                                  return const Center(
+                                      child: Text('Location not ready'));
+                                }
+                                return GoogleMap(
+                                  onMapCreated: (c) => _mapController = c,
+                                  initialCameraPosition: CameraPosition(
+                                    target: _myLatLng!,
+                                    zoom: 14,
+                                  ),
+                                  myLocationEnabled: true,
+                                  myLocationButtonEnabled: true,
+                                  markers: _markers,
+                                  compassEnabled: true,
+                                  zoomControlsEnabled: false,
+                                  onCameraMoveStarted: () {},
+                                );
+                              } catch (e) {
+                                return Center(
+                                  child: Text(
+                                    'Map failed to load',
+                                    style: TextStyle(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .error),
+                                  ),
+                                );
+                              }
+                            },
                           ),
                         ),
                       ),
