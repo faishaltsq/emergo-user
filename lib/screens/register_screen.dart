@@ -130,10 +130,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 const Text('Creating account…'),
                               ],
                             )
-                          : Row(
+                          : const Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               mainAxisSize: MainAxisSize.min,
-                              children: const [
+                              children: [
                                 Icon(Icons.person_add_alt_1_rounded),
                                 SizedBox(width: 8),
                                 Text('Create Account'),

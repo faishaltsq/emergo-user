@@ -163,26 +163,64 @@ class EmergencyScreen extends StatelessWidget {
       context: context,
       builder: (ctx) {
         return StatefulBuilder(
-          builder: (ctx, setState) {
+          builder: (ctx, setDialogState) {
             Future<void> pickFromCamera() async {
-              final granted = await PermissionService.ensureCameraPermission();
-              if (!granted) return;
-              final picker = ImagePicker();
-              final photo = await picker.pickImage(
-                  source: ImageSource.camera, imageQuality: 75);
-              if (photo != null) {
-                setState(() => selectedImage = photo);
+              try {
+                final granted =
+                    await PermissionService.ensureCameraPermission();
+                if (!granted) {
+                  if (ctx.mounted) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      const SnackBar(
+                          content: Text('Camera permission required')),
+                    );
+                  }
+                  return;
+                }
+
+                final picker = ImagePicker();
+                final photo = await picker.pickImage(
+                    source: ImageSource.camera, imageQuality: 75);
+                if (photo != null) {
+                  setDialogState(() => selectedImage = photo);
+                }
+              } catch (e) {
+                print('Error picking from camera: $e');
+                if (ctx.mounted) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('Failed to take photo')),
+                  );
+                }
               }
             }
 
             Future<void> pickFromGallery() async {
-              final granted = await PermissionService.ensureGalleryPermission();
-              if (!granted) return;
-              final picker = ImagePicker();
-              final file = await picker.pickImage(
-                  source: ImageSource.gallery, imageQuality: 75);
-              if (file != null) {
-                setState(() => selectedImage = file);
+              try {
+                final granted =
+                    await PermissionService.ensureGalleryPermission();
+                if (!granted) {
+                  if (ctx.mounted) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      const SnackBar(
+                          content: Text('Gallery permission required')),
+                    );
+                  }
+                  return;
+                }
+
+                final picker = ImagePicker();
+                final file = await picker.pickImage(
+                    source: ImageSource.gallery, imageQuality: 75);
+                if (file != null) {
+                  setDialogState(() => selectedImage = file);
+                }
+              } catch (e) {
+                print('Error picking from gallery: $e');
+                if (ctx.mounted) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('Failed to select image')),
+                  );
+                }
               }
             }
 
@@ -244,84 +282,114 @@ class EmergencyScreen extends StatelessWidget {
                 children: [
                   Icon(_iconForType(type), color: color),
                   const SizedBox(width: 8),
-                  Text('$label Emergency'),
+                  Expanded(child: Text('$label Emergency')),
                 ],
               ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (selectedImage != null)
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.file(
-                          File(selectedImage!.path),
-                          height: 160,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                        ),
-                      )
-                    else if (imageUrl != null && imageUrl.isNotEmpty)
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          imageUrl,
-                          height: 160,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          errorBuilder: (c, e, s) => Container(
-                            height: 160,
-                            color: Colors.grey.shade200,
-                            alignment: Alignment.center,
-                            child: const Text('Image not available'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Image preview section
+                      if (selectedImage != null)
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.file(
+                            File(selectedImage!.path),
+                            height: 140,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                          ),
+                        )
+                      else if (imageUrl != null && imageUrl.isNotEmpty)
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            imageUrl,
+                            height: 140,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (c, e, s) => Container(
+                              height: 140,
+                              color: Colors.grey.shade200,
+                              alignment: Alignment.center,
+                              child: const Text('Image not available'),
+                            ),
+                          ),
+                        )
+                      else
+                        Container(
+                          height: 100,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          alignment: Alignment.center,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.add_photo_alternate,
+                                  size: 32, color: Colors.grey.shade600),
+                              const SizedBox(height: 4),
+                              Text('Add Photo (Optional)',
+                                  style: TextStyle(
+                                      color: Colors.grey.shade600,
+                                      fontSize: 12)),
+                            ],
                           ),
                         ),
-                      )
-                    else
-                      Container(
-                        height: 120,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        alignment: Alignment.center,
-                        child: const Text('No image configured'),
+                      const SizedBox(height: 8),
+                      // Camera and gallery buttons
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: pickFromCamera,
+                              icon: const Icon(Icons.photo_camera, size: 18),
+                              label: const Text('Camera'),
+                              style: OutlinedButton.styleFrom(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 8),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: pickFromGallery,
+                              icon: const Icon(Icons.photo_library, size: 18),
+                              label: const Text('Gallery'),
+                              style: OutlinedButton.styleFrom(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 8),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        OutlinedButton.icon(
-                          onPressed: pickFromCamera,
-                          icon: const Icon(Icons.photo_camera),
-                          label: const Text('Camera'),
-                        ),
-                        const SizedBox(width: 8),
-                        OutlinedButton.icon(
-                          onPressed: pickFromGallery,
-                          icon: const Icon(Icons.photo_library),
-                          label: const Text('Gallery'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'You are about to send a $label emergency alert. Your current location and time will be included. Add any additional details below (optional):',
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: infoController,
-                      maxLines: 3,
-                      decoration: InputDecoration(
-                        hintText:
-                            'Additional info (e.g., number of people, severity)',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
+                      const SizedBox(height: 12),
+                      Text(
+                        'You are about to send a $label emergency alert. Your current location and time will be included. Add any additional details below (optional):',
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: infoController,
+                        maxLines: 3,
+                        decoration: InputDecoration(
+                          hintText:
+                              'Additional info (e.g., number of people, severity)',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          contentPadding: const EdgeInsets.all(12),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               actions: [

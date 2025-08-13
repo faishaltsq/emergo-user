@@ -58,11 +58,16 @@ class EmergencyService {
       // Save to local storage
       await _saveEmergencyToLocal(emergency);
 
+      // Get incident type ID from API
+      final incidentTypeId = await getIncidentTypeId(type);
+
       // Send to backend API using authenticated user token
       await _sendToIncidentsAPI(
-        incidentTypeId: _incidentTypeIdFor(type),
+        incidentTypeId: incidentTypeId,
         latitude: position.latitude,
         longitude: position.longitude,
+        additionalInfo: additionalInfo,
+        imageBase64: imageBase64,
       );
 
       // Local notification confirmation
@@ -78,44 +83,137 @@ class EmergencyService {
     }
   }
 
+  // Helper method to test if token is valid
+  static Future<bool> _testTokenValidity() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token');
+
+      if (token == null || token.isEmpty) {
+        print('No token found in storage');
+        return false;
+      }
+
+      // Test token by calling a simple endpoint - use /users/me as it's more reliable
+      final uri = Uri.parse('$_baseUrl/users/me');
+      final res = await http.get(
+        uri,
+        headers: {
+          'accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      print('Token test result: ${res.statusCode}');
+
+      if (res.statusCode == 401) {
+        print('Token is expired or invalid - clearing stored token');
+        await prefs.remove('access_token');
+        await prefs.remove('token_type');
+        return false;
+      }
+
+      return res.statusCode == 200;
+    } catch (e) {
+      print('Token test error: $e');
+      return false;
+    }
+  }
+
   static Future<void> _sendToIncidentsAPI({
     required int incidentTypeId,
     required double latitude,
     required double longitude,
+    String? additionalInfo,
+    String? imageBase64,
   }) async {
+    // Test token validity first
+    final tokenValid = await _testTokenValidity();
+    print('Token validity check: $tokenValid');
+
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('access_token');
       final tokenType = prefs.getString('token_type') ?? 'Bearer';
+
+      print(
+          'Debug - Token: ${token?.substring(0, 10)}..., TokenType: $tokenType');
+
       if (token == null || token.isEmpty) {
         throw Exception('User not authenticated');
       }
 
-      final uri = Uri.parse('$_baseUrl/users/me/incidents');
+      // Use the new endpoint format as requested
+      final uri = Uri.parse('$_baseUrl/incidents');
+      print('Debug - Submitting to: $uri');
+
+      // Test with JSON format first to ensure authentication works
       final headers = <String, String>{
         'accept': 'application/json',
         'Content-Type': 'application/json',
-        'Authorization': '$tokenType $token',
+        'Authorization': 'Bearer $token', // Changed to uppercase Bearer
       };
 
+      print('Debug - Headers: $headers');
       final body = jsonEncode({
         'incidenttypeid': incidentTypeId,
         'latitude': latitude,
         'longitude': longitude,
+        if (additionalInfo != null && additionalInfo.isNotEmpty)
+          'description': additionalInfo,
       });
 
+      print('Debug - Body: $body');
+
       final res = await http.post(uri, headers: headers, body: body);
+
+      print('Debug - Response status: ${res.statusCode}');
+      print('Debug - Response headers: ${res.headers}');
+
+      // Handle redirects (301, 302, 307, 308)
+      if (res.statusCode >= 300 && res.statusCode < 400) {
+        final location = res.headers['location'];
+        print(
+            'Redirect detected. Status: ${res.statusCode}, Location: $location');
+
+        if (location != null) {
+          final redirectUri = Uri.parse(location);
+          print('Following redirect to: $redirectUri');
+
+          final redirectRes =
+              await http.post(redirectUri, headers: headers, body: body);
+          print('Redirect response status: ${redirectRes.statusCode}');
+
+          if (redirectRes.statusCode >= 200 && redirectRes.statusCode < 300) {
+            print(
+                'Incident submitted successfully via redirect: ${redirectRes.body}');
+            return;
+          } else {
+            print(
+                'Redirect failed: ${redirectRes.statusCode} - ${redirectRes.body}');
+            throw Exception(
+                'Incident API error after redirect ${redirectRes.statusCode}');
+          }
+        } else {
+          print('Redirect without location header');
+          throw Exception('Incident API redirect error ${res.statusCode}');
+        }
+      }
+
       if (res.statusCode < 200 || res.statusCode >= 300) {
         // Try to log server-provided error
         try {
           final parsed = jsonDecode(res.body);
           print('Incident submit failed: ${res.statusCode} - $parsed');
         } catch (_) {
-          print('Incident submit failed: ${res.statusCode}');
+          print('Incident submit failed: ${res.statusCode} - ${res.body}');
         }
         throw Exception('Incident API error ${res.statusCode}');
       }
+
+      print('Incident submitted successfully: ${res.body}');
     } catch (e) {
+      print('Error submitting incident: $e');
       rethrow;
     }
   }
@@ -219,17 +317,16 @@ class EmergencyService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('access_token');
-      final tokenType = prefs.getString('token_type') ?? 'Bearer';
       if (token == null || token.isEmpty) {
         throw Exception('Unauthenticated');
       }
 
-      final uri = Uri.parse('$_baseUrl/users/me/incidents');
+      final uri = Uri.parse('$_baseUrl/incidents');
       final res = await http.get(
         uri,
         headers: {
           'accept': 'application/json',
-          'Authorization': '$tokenType $token',
+          'Authorization': 'Bearer $token',
         },
       );
 
@@ -279,6 +376,88 @@ class EmergencyService {
     } catch (_) {
       // On any error during background check, fail-open (no active)
       return false;
+    }
+  }
+
+  // Fetch incident types from the API
+  static Future<List<Map<String, dynamic>>> fetchIncidentTypes() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token');
+
+      if (token == null || token.isEmpty) {
+        throw Exception('User not authenticated');
+      }
+
+      final uri = Uri.parse('$_baseUrl/incident-types');
+      print('Debug - Fetching incident types from: $uri');
+
+      final res = await http.get(
+        uri,
+        headers: {
+          'accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (res.statusCode == 200) {
+        final parsed = jsonDecode(res.body);
+        if (parsed is List) {
+          return List<Map<String, dynamic>>.from(parsed);
+        }
+        // If server returns an object, try to unwrap array-like key
+        if (parsed is Map && parsed['data'] is List) {
+          return List<Map<String, dynamic>>.from(parsed['data']);
+        }
+        throw Exception('Unexpected incident types response format');
+      }
+
+      // Try extract server error
+      try {
+        final body = jsonDecode(res.body);
+        throw Exception('Incident types error ${res.statusCode}: $body');
+      } catch (_) {
+        throw Exception('Incident types error ${res.statusCode}');
+      }
+    } catch (e) {
+      print('Error fetching incident types: $e');
+      rethrow;
+    }
+  }
+
+  // Get incident type ID by emergency type
+  static Future<int> getIncidentTypeId(EmergencyType type) async {
+    try {
+      final incidentTypes = await fetchIncidentTypes();
+
+      // Map emergency types to expected incident type names
+      String typeName;
+      switch (type) {
+        case EmergencyType.medical:
+          typeName = 'Darurat Medis';
+          break;
+        case EmergencyType.fire:
+          typeName = 'Kebakaran';
+          break;
+        case EmergencyType.crime:
+          typeName = 'Kriminal';
+          break;
+        case EmergencyType.disaster:
+          typeName = 'Bencana Alam';
+          break;
+      }
+
+      // Find matching incident type
+      final matchingType = incidentTypes.firstWhere(
+        (incidentType) => incidentType['name'] == typeName,
+        orElse: () => throw Exception('Incident type not found: $typeName'),
+      );
+
+      return matchingType['id'] as int;
+    } catch (e) {
+      print('Error getting incident type ID: $e');
+      // Fallback to hardcoded IDs if API fails
+      return _incidentTypeIdFor(type);
     }
   }
 }

@@ -51,7 +51,15 @@ class PermissionService {
       final photosStatus = await Permission.photos.status;
       if (photosStatus.isGranted) return true;
 
-      return true;
+      // Request photos permission on iOS
+      final requestResult = await Permission.photos.request();
+      if (requestResult.isGranted) return true;
+
+      // If permanently denied, open settings
+      if (requestResult.isPermanentlyDenied) {
+        await openAppSettings();
+      }
+      return requestResult.isGranted;
     } else {
       // On Android 13+, Permission.photos maps to READ_MEDIA_IMAGES
       // On older Android, Permission.storage maps to READ_EXTERNAL_STORAGE
