@@ -223,7 +223,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   Widget _buildStatusBadge(BuildContext context, EmergencyStatus status) {
-    final isHandled = status == EmergencyStatus.handled;
+    final isHandled = status == EmergencyStatus.solved;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -241,7 +241,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ),
           const SizedBox(width: 4),
           Text(
-            isHandled ? 'handled' : 'pending',
+            status.name.toUpperCase(),
             style: TextStyle(
               fontSize: 12,
               color: isHandled ? Colors.green.shade800 : Colors.amber.shade800,
@@ -295,9 +295,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
       case 2:
         return EmergencyStatus.pending; // In Progress
       case 3:
-        return EmergencyStatus.handled; // Resolved
+        return EmergencyStatus.enroute; // Resolved
       case 4:
-        return EmergencyStatus.handled; // Closed
+        return EmergencyStatus.solved; // Closed
       default:
         return EmergencyStatus.pending;
     }
