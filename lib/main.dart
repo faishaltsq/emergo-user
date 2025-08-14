@@ -102,11 +102,11 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     // Request app-wide permissions on first run
     _requestStartupPermissions();
 
-  // Cache providers for listeners
-  _settingsProvider = context.read<SettingsProvider>();
-  _userProvider = context.read<UserProvider>();
+    // Cache providers for listeners
+    _settingsProvider = context.read<SettingsProvider>();
+    _userProvider = context.read<UserProvider>();
 
-  // Build screens so HomeScreen can request tab changes
+    // Build screens so HomeScreen can request tab changes
     _screens = [
       HomeScreen(
         onNavigateToTab: (index) {
@@ -126,12 +126,12 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     // Start shake detection when app starts
     _initializeShakeDetection();
 
-  // Start/stop incident watcher based on auth
-  _updateIncidentWatcher();
+    // Start/stop incident watcher based on auth
+    _updateIncidentWatcher();
 
-  // Listen for settings/auth changes
-  _settingsProvider.addListener(_onSettingsChanged);
-  _userProvider.addListener(_onUserChanged);
+    // Listen for settings/auth changes
+    _settingsProvider.addListener(_onSettingsChanged);
+    _userProvider.addListener(_onUserChanged);
   }
 
   Future<void> _requestStartupPermissions() async {
@@ -153,9 +153,9 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     ShakeDetectionService.stopListening();
-  IncidentWatcher.stop();
-  _settingsProvider.removeListener(_onSettingsChanged);
-  _userProvider.removeListener(_onUserChanged);
+    IncidentWatcher.stop();
+    _settingsProvider.removeListener(_onSettingsChanged);
+    _userProvider.removeListener(_onUserChanged);
     super.dispose();
   }
 

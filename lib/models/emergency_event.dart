@@ -9,7 +9,9 @@ enum EmergencyType {
 
 enum EmergencyStatus {
   pending,
-  handled,
+  enroute,
+  solved,
+  denied,
 }
 
 class EmergencyEvent {
@@ -24,7 +26,7 @@ class EmergencyEvent {
     required this.dateTime,
     required this.status,
   });
-  
+
   IconData get icon {
     switch (type) {
       case EmergencyType.medical:
@@ -37,7 +39,7 @@ class EmergencyEvent {
         return Icons.warning;
     }
   }
-  
+
   String get typeName {
     switch (type) {
       case EmergencyType.medical:

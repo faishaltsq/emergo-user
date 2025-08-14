@@ -16,7 +16,8 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> {
-  MapController? _mapController;
+  // Non-nullable controller initialized in initState to avoid null checks and race conditions
+  late final MapController _mapController;
   LatLng? _myLatLng;
   bool _loading = true;
   String? _error;
@@ -37,6 +38,7 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void initState() {
     super.initState();
+    _mapController = MapController();
     _init();
   }
 
@@ -57,6 +59,7 @@ class _MapScreenState extends State<MapScreen> {
     try {
       // Ensure location permission and services
       final locPerm = await PermissionService.ensureLocationPermission();
+      if (!mounted) return;
       if (!locPerm) {
         setState(() {
           _loading = false;
@@ -66,6 +69,7 @@ class _MapScreenState extends State<MapScreen> {
       }
 
       final enabled = await Geolocator.isLocationServiceEnabled();
+      if (!mounted) return;
       if (!enabled) {
         setState(() {
           _loading = false;
@@ -75,6 +79,7 @@ class _MapScreenState extends State<MapScreen> {
       }
 
       final pos = await LocationService.getCurrentPosition();
+      if (!mounted) return;
       if (pos == null) {
         setState(() {
           _loading = false;
@@ -83,12 +88,14 @@ class _MapScreenState extends State<MapScreen> {
         return;
       }
 
+      if (!mounted) return;
       setState(() {
         _myLatLng = LatLng(pos.latitude, pos.longitude);
       });
 
       await _loadPlaces();
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _loading = false;
         _error = 'Error: $e';
@@ -99,6 +106,7 @@ class _MapScreenState extends State<MapScreen> {
   Future<void> _loadPlaces() async {
     if (_myLatLng == null) return;
 
+    if (!mounted) return;
     setState(() {
       _loading = true;
       _error = null;
@@ -156,15 +164,19 @@ class _MapScreenState extends State<MapScreen> {
       // Build markers efficiently
       _buildMarkersOptimized(filteredPlaces);
 
+      if (!mounted) return;
       setState(() {
         _places = filteredPlaces;
         _loading = false;
       });
 
       // Move camera to my location on first load
-      _mapController?.move(_myLatLng!, 14.0);
+      if (_myLatLng != null) {
+        _mapController.move(_myLatLng!, 14.0);
+      }
     } catch (e) {
       print('Error loading places: $e');
+      if (!mounted) return;
       setState(() {
         _loading = false;
         _error = 'Failed to load nearby facilities: $e';
@@ -561,7 +573,6 @@ class _MapScreenState extends State<MapScreen> {
                                   return const Center(
                                       child: Text('Location not ready'));
                                 }
-                                _mapController ??= MapController();
                                 return FlutterMap(
                                   mapController: _mapController,
                                   options: MapOptions(

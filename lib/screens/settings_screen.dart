@@ -40,7 +40,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _shakeToSOS = settings.shakeToSOSEnabled;
       _notifications = settings.notificationsEnabled;
       _hydrated = true;
-  // Shake listener lifecycle is managed centrally by MainScreen
+      // Shake listener lifecycle is managed centrally by MainScreen
     }
 
     // Sync text fields with provider when logged in
